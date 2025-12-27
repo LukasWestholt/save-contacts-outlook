@@ -19,23 +19,9 @@ def showUserText(title, text, style):
 
 def showUserError(text):
     print(text)
-    showUserText( "Fehler", text, 0)
+    showUserText("Fehler", text, 0)
     return sys.exit(1)
 
-if len(sys.argv) < 2:
-    showUserError("No email file provided")
-
-msg_path = sys.argv[1]
-
-outlook = win32com.client.Dispatch("Outlook.Application")
-namespace = outlook.GetNamespace("MAPI")
-
-msg = namespace.OpenSharedItem(msg_path)
-
-print("Subject:", msg.Subject)
-print("From:", msg.SenderName)
-print("Email:", msg.SenderEmailAddress)
-print("Body preview:", msg.Body[:200])
 
 def build_contact(contact):
     try:
@@ -44,12 +30,18 @@ def build_contact(contact):
     except ValueError:
         recipients = msg.Recipients
         if len(recipients) != 1:
-            showUserError("Kein eindeutiger Sender oder Empfänger gefunden,")
-        name = msg.SenderName[0].Name
-        mail = msg.SenderName[0].Address
-    name = askstring("Deine Eingabe wird erfordert", f"Wie heißt die Person von Adresse {email}", name)
-    # contact.FirstName = "John"
-    # contact.LastName = "Doe"
+            showUserError("Kein eindeutiger Sender oder Empfänger gefunden")
+        name = recipients[0].Name
+        mail = recipients[0].Address
+    if "@" in name and not mail:
+        mail = name
+        name = askstring("Deine Eingabe wird erfordert", f"Wie heißt die Person von Adresse {mail}? Bitte eingeben als <Nachname>, <Vorname>.")
+    else:
+        name = askstring("Deine Eingabe wird erfordert", f"Wie heißt die Person von Adresse {mail}? Vielleicht {name}? Bitte eingeben als <Nachname>, <Vorname>.")
+
+    if not name or not mail:
+        showUserError("Unvollständiger Kontakt! Abbrechen.")
+    
     contact.FullName = name
     contact.Email1Address = mail
 
@@ -70,6 +62,25 @@ def get_target_address_folder(root=True, filter: str = "My Contact Book"):
             return folder
     print("Contact folders:")
     print_address_folder(contacts_root)
+
+if len(sys.argv) < 2:
+    showUserError("No email file provided")
+
+# Force UTF-8 for console, so we can print crazy subject messages
+sys.stdout.reconfigure(encoding="utf-8")
+
+msg_path = sys.argv[1]
+print(msg_path)
+
+outlook = win32com.client.Dispatch("Outlook.Application")
+namespace = outlook.GetNamespace("MAPI")
+
+msg = namespace.OpenSharedItem(msg_path)
+
+print("Subject:", msg.Subject)
+print("From:", msg.SenderName)
+print("Email:", msg.SenderEmailAddress)
+print("Body preview:", str(msg.Body[:100]).replace("\r\n", "\\n").replace("\n", "\\n"))
 
 target_folder = get_target_address_folder()
 if target_folder is None:

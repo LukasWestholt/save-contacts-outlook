@@ -9,10 +9,13 @@ Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = True
 Sub SendSelectedMailToPython()
 
+    Const MAX_SUBJECT_LEN As Long = 120
+
     Dim sel As Selection
     Dim mail As Outlook.MailItem
     Dim path As String
     Dim shell As Object
+    Dim subjectPart As String
 
     basePath = Environ("LOCALAPPDATA") & "\save-contacts-outlook\"
 
@@ -33,9 +36,35 @@ Sub SendSelectedMailToPython()
 
     Set mail = sel.Item(1)
 
+    Function AlphaNumOnly(ByVal txt As String) As String
+        Dim i As Long
+        Dim ch As String
+        Dim result As String
+
+        For i = 1 To Len(txt)
+            ch = Mid$(txt, i, 1)
+            If ch Like "[A-Za-z0-9 ]" Then
+                If ch = " " Then ch = "_"
+                result = result & ch
+            End If
+        Next i
+
+        AlphaNumOnly = result
+    End Function
+
+    subjectPart = AlphaNumOnly(mail.Subject)
+
+    If Len(subjectPart) > MAX_SUBJECT_LEN Then
+        subjectPart = Left(subjectPart, MAX_SUBJECT_LEN)
+    End If
+
+    If Len(subjectPart) = 0 Then
+        subjectPart = "NoSubject"
+    End If
+
     path = basePath & _
            Format(Now, "yyyymmdd_hhnnss_") & _
-           Replace(mail.Subject, ":", "_") & ".msg"
+           subjectPart & ".msg"
 
     mail.SaveAs path, olMSG
 
@@ -43,5 +72,3 @@ Sub SendSelectedMailToPython()
     shell.Run """" & basePath & "run.bat" & """ """ & path & """", 1, False
 
 End Sub
-
-
