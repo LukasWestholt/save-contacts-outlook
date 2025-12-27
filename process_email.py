@@ -23,16 +23,20 @@ def showUserError(text):
     return sys.exit(1)
 
 
-def build_contact(contact):
+def build_contact(contact, deny_list: list[str] | None = None):
     try:
         name = msg.SenderName
         mail = msg.SenderEmailAddress
+        if (not mail and not name) or any([deny_word in name.lower() or deny_word in mail.lower() for deny_word in deny_list]):
+            raise ValueError("Wrong contact")
     except ValueError:
         recipients = msg.Recipients
         if len(recipients) != 1:
             showUserError("Kein eindeutiger Sender oder Empfänger gefunden")
         name = recipients[0].Name
         mail = recipients[0].Address
+        if any([deny_word in name.lower() or deny_word in mail.lower() for deny_word in deny_list]):
+            showUserError("Keine Mail-Adresse in dieser Mail gefunden. Kontaktformular ist nicht unterstützt. Abbrechen.")
     if "@" in name and not mail:
         mail = name
         name = askstring("Deine Eingabe wird erfordert", f"Wie heißt die Person von Adresse {mail}? Bitte eingeben als <Nachname>, <Vorname>.")
@@ -88,6 +92,6 @@ if target_folder is None:
 
 # Create contact
 contact = target_folder.Items.Add("IPM.Contact")
-build_contact(contact)
+build_contact(contact, deny_list=["noreply", "donotreply"])
 contact.Save()
 print("Contact saved successfully")
