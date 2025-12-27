@@ -1,10 +1,29 @@
 import sys
-import os
 import win32com.client
+import ctypes
+from tkinter.simpledialog import askstring
+
+
+def showUserText(title, text, style):
+    ##  Styles:
+    ##  0 : OK
+    ##  1 : OK | Cancel
+    ##  2 : Abort | Retry | Ignore
+    ##  3 : Yes | No | Cancel
+    ##  4 : Yes | No
+    ##  5 : Retry | Cancel
+    ##  6 : Cancel | Try Again | Continue
+
+    return ctypes.windll.user32.MessageBoxW(0, text, title, style)
+
+
+def showUserError(text):
+    print(text)
+    showUserText( "Fehler", text, 0)
+    return sys.exit(1)
 
 if len(sys.argv) < 2:
-    print("No email file provided")
-    sys.exit(1)
+    showUserError("No email file provided")
 
 msg_path = sys.argv[1]
 
@@ -18,36 +37,46 @@ print("From:", msg.SenderName)
 print("Email:", msg.SenderEmailAddress)
 print("Body preview:", msg.Body[:200])
 
-# Get default Contacts folder
-contacts_root = namespace.GetDefaultFolder(10)  # 10 = olFolderContacts
+def build_contact(contact):
+    try:
+        name = msg.SenderName
+        mail = msg.SenderEmailAddress
+    except ValueError:
+        recipients = msg.Recipients
+        if len(recipients) != 1:
+            showUserError("Kein eindeutiger Sender oder Empfänger gefunden,")
+        name = msg.SenderName[0].Name
+        mail = msg.SenderName[0].Address
+    name = askstring("Deine Eingabe wird erfordert", f"Wie heißt die Person von Adresse {email}", name)
+    # contact.FirstName = "John"
+    # contact.LastName = "Doe"
+    contact.FullName = name
+    contact.Email1Address = mail
 
-def walk_folders(folder, indent=0):
+def print_address_folder(folder, indent=0):
     print(" " * indent + f"- {folder.Name}")
     for sub in folder.Folders:
-        walk_folders(sub, indent + 2)
+        print_address_folder(sub, indent + 2)
 
-#print("Contact folders:")
-#walk_folders(contacts_root)
+def get_target_address_folder(root=True, filter: str = "My Contact Book"):
+    # Get default Contacts folder
+    contacts_root = namespace.GetDefaultFolder(10)  # 10 = olFolderContacts
+    if root:
+        return contacts_root
 
-# OPTIONAL: navigate to a subfolder (contact book)
-#target_folder = None
-#for folder in contacts_root.Folders:
-#    print(folder.Name)
-#    if folder.Name == "My Contact Book":
-#        target_folder = folder
-#        break
+    # OPTIONAL: navigate to a subfolder (contact book)
+    for folder in contacts_root.Folders:
+        if folder.Name == filter:
+            return folder
+    print("Contact folders:")
+    print_address_folder(contacts_root)
 
-target_folder = contacts_root
-
+target_folder = get_target_address_folder()
 if target_folder is None:
     raise Exception("Target contact folder not found")
 
 # Create contact
 contact = target_folder.Items.Add("IPM.Contact")
-
-#contact.FirstName = "John"
-#contact.LastName = "Doe"
-contact.FullName = msg.SenderName
-contact.Email1Address = msg.SenderEmailAddress
+build_contact(contact)
 contact.Save()
 print("Contact saved successfully")
